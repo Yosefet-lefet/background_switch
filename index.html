@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#9c4b38" />
+    <title></title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+      }
+
+      .canvas {
+        min-height: 100svh;
+        background-color: #9c4b38;
+        cursor: pointer;
+        transition: background-color 450ms ease;
+        user-select: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas" id="canvas"></main>
+
+    <script>
+      const canvas = document.querySelector("#canvas");
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+
+      function toHex(hue, saturation, lightness) {
+        const s = saturation / 100;
+        const l = lightness / 100;
+        const chroma = (1 - Math.abs(2 * l - 1)) * s;
+        const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+        const offset = l - chroma / 2;
+        const segments = [
+          [chroma, x, 0],
+          [x, chroma, 0],
+          [0, chroma, x],
+          [0, x, chroma],
+          [x, 0, chroma],
+          [chroma, 0, x],
+        ];
+        const [red, green, blue] = segments[Math.floor(hue / 60)].map((value) =>
+          Math.round((value + offset) * 255),
+        );
+        return `#${[red, green, blue]
+          .map((channel) => channel.toString(16).padStart(2, "0"))
+          .join("")}`;
+      }
+
+      function updateColor() {
+        const hue = Math.floor(Math.random() * 360);
+        const saturation = 52 + Math.floor(Math.random() * 25);
+        const lightness = 42 + Math.floor(Math.random() * 25);
+        const color = toHex(hue, saturation, lightness);
+        const cssColor = `hsl(${hue} ${saturation}% ${lightness}%)`;
+        canvas.style.backgroundColor = cssColor;
+        themeColor.setAttribute("content", color);
+      }
+
+      canvas.addEventListener("click", updateColor);
+    </script>
+  </body>
+</html>
