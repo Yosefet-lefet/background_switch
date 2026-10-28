@@ -50,7 +50,46 @@
     <script>
       const canvas = document.querySelector("#canvas");
       const themeColor = document.querySelector('meta[name="theme-color"]');
+      const favicon = document.querySelector('link[rel="icon"]');
+      const faviconCanvas = document.createElement("canvas");
+      const faviconContext = faviconCanvas.getContext("2d");
+      faviconCanvas.width = 32;
+      faviconCanvas.height = 32;
       let activeReveal;
+
+      function drawFavicon(hue) {
+        faviconContext.clearRect(0, 0, faviconCanvas.width, faviconCanvas.height);
+        faviconContext.fillStyle = `hsl(${hue} 72% 55%)`;
+        faviconContext.beginPath();
+        faviconContext.arc(16, 16, 14, 0, Math.PI * 2);
+        faviconContext.fill();
+        favicon.type = "image/png";
+        favicon.href = faviconCanvas.toDataURL("image/png");
+      }
+
+      let faviconStartHue = Math.random() * 360;
+      let faviconTargetHue = Math.random() * 360;
+      let faviconTransitionStarted = performance.now();
+      let faviconTransitionDuration = 3500;
+
+      drawFavicon(faviconStartHue);
+      window.setInterval(() => {
+        const now = performance.now();
+        const progress = Math.min(
+          (now - faviconTransitionStarted) / faviconTransitionDuration,
+          1,
+        );
+        const hueDifference = ((faviconTargetHue - faviconStartHue + 540) % 360) - 180;
+        const easedProgress = progress * progress * (3 - 2 * progress);
+        drawFavicon((faviconStartHue + hueDifference * easedProgress + 360) % 360);
+
+        if (progress === 1) {
+          faviconStartHue = faviconTargetHue;
+          faviconTargetHue = Math.random() * 360;
+          faviconTransitionStarted = now;
+          faviconTransitionDuration = 3000 + Math.random() * 3000;
+        }
+      }, 250);
 
       function toHex(hue, saturation, lightness) {
         const s = saturation / 100;
