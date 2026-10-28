@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#9c4b38" />
+    <title></title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+      }
+
+      .canvas {
+        min-height: 100svh;
+        background-color: #9c4b38;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .color-reveal {
+        position: fixed;
+        z-index: 1;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas" id="canvas"></main>
+
+    <script>
+      const canvas = document.querySelector("#canvas");
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      let activeReveal;
+
+      function toHex(hue, saturation, lightness) {
+        const s = saturation / 100;
+        const l = lightness / 100;
+        const chroma = (1 - Math.abs(2 * l - 1)) * s;
+        const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+        const offset = l - chroma / 2;
+        const segments = [
+          [chroma, x, 0],
+          [x, chroma, 0],
+          [0, chroma, x],
+          [0, x, chroma],
+          [x, 0, chroma],
+          [chroma, 0, x],
+        ];
+        const [red, green, blue] = segments[Math.floor(hue / 60)].map((value) =>
+          Math.round((value + offset) * 255),
+        );
+        return `#${[red, green, blue]
+          .map((channel) => channel.toString(16).padStart(2, "0"))
+          .join("")}`;
+      }
+
+      function updateColor(event) {
+        const hue = Math.floor(Math.random() * 360);
+        const saturation = 52 + Math.floor(Math.random() * 25);
+        const lightness = 42 + Math.floor(Math.random() * 25);
+        const color = toHex(hue, saturation, lightness);
+        const cssColor = `hsl(${hue} ${saturation}% ${lightness}%)`;
+        themeColor.setAttribute("content", color);
+
+        if (activeReveal) {
+          canvas.style.backgroundColor = activeReveal.cssColor;
+          activeReveal.animation.cancel();
+          activeReveal.element.remove();
+          activeReveal = undefined;
+        }
+
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          canvas.style.backgroundColor = cssColor;
+          return;
+        }
+
+        const x = event.clientX;
+        const y = event.clientY;
+        const radius = Math.hypot(
+          Math.max(x, window.innerWidth - x),
+          Math.max(y, window.innerHeight - y),
+        );
+        const reveal = document.createElement("div");
+        reveal.className = "color-reveal";
+        reveal.style.backgroundColor = cssColor;
+        reveal.style.width = `${radius * 2}px`;
+        reveal.style.height = `${radius * 2}px`;
+        reveal.style.left = `${x - radius}px`;
+        reveal.style.top = `${y - radius}px`;
+        document.body.append(reveal);
+
+        const animation = reveal.animate(
+          [
+            { transform: "scale(0.0005)" },
+            { transform: "scale(1)" },
+          ],
+          { duration: 750, easing: "ease-out" },
+        );
+        const revealState = { animation, cssColor, element: reveal };
+        activeReveal = revealState;
+        animation.onfinish = () => {
+          if (activeReveal !== revealState) return;
+          canvas.style.backgroundColor = cssColor;
+          reveal.remove();
+          activeReveal = undefined;
+        };
+      }
+
+      canvas.addEventListener("click", updateColor);
+    </script>
+  </body>
+</html>
