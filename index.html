@@ -28,11 +28,72 @@
         user-select: none;
       }
 
+      .color-cursor {
+        position: fixed;
+        z-index: 3;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        transition: background-color 250ms linear, opacity 120ms ease;
+      }
+
+      .color-cursor.is-visible {
+        opacity: 1;
+      }
+
+      .cursor-face {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 180ms ease;
+      }
+
+      .has-smile .cursor-face {
+        opacity: 1;
+      }
+
+      .cursor-eye {
+        position: absolute;
+        top: 10px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #171717;
+      }
+
+      .cursor-eye:first-child {
+        left: 12px;
+      }
+
+      .cursor-eye:nth-child(2) {
+        right: 12px;
+      }
+
+      .cursor-smile {
+        position: absolute;
+        top: 19px;
+        left: 11px;
+        width: 18px;
+        height: 9px;
+        border: 2px solid #171717;
+        border-top: 0;
+        border-radius: 0 0 12px 12px;
+      }
+
       .color-reveal {
         position: fixed;
         z-index: 1;
         border-radius: 50%;
         pointer-events: none;
+      }
+
+      @media (hover: hover) and (pointer: fine) {
+        .canvas {
+          cursor: none;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -41,14 +102,28 @@
         *::after {
           scroll-behavior: auto !important;
         }
+
+        .color-cursor,
+        .cursor-face {
+          transition-duration: 0.01ms;
+        }
       }
     </style>
   </head>
   <body>
-    <main class="canvas" id="canvas"></main>
+    <main class="canvas" id="canvas">
+      <div class="color-cursor" id="color-cursor" aria-hidden="true">
+        <span class="cursor-face">
+          <span class="cursor-eye"></span>
+          <span class="cursor-eye"></span>
+          <span class="cursor-smile"></span>
+        </span>
+      </div>
+    </main>
 
     <script>
       const canvas = document.querySelector("#canvas");
+      const colorCursor = document.querySelector("#color-cursor");
       const themeColor = document.querySelector('meta[name="theme-color"]');
       const favicon = document.querySelector('link[rel="icon"]');
       const faviconCanvas = document.createElement("canvas");
@@ -65,6 +140,7 @@
         faviconContext.fill();
         favicon.type = "image/png";
         favicon.href = faviconCanvas.toDataURL("image/png");
+        colorCursor.style.backgroundColor = `hsl(${hue} 72% 55%)`;
       }
 
       let faviconStartHue = Math.random() * 360;
@@ -165,6 +241,24 @@
         };
       }
 
+      canvas.addEventListener("pointermove", (event) => {
+        colorCursor.style.left = `${event.clientX}px`;
+        colorCursor.style.top = `${event.clientY}px`;
+        colorCursor.classList.add("is-visible");
+      });
+      canvas.addEventListener("pointerdown", () => {
+        colorCursor.classList.add("has-smile");
+      });
+      canvas.addEventListener("pointerup", () => {
+        colorCursor.classList.remove("has-smile");
+      });
+      canvas.addEventListener("pointercancel", () => {
+        colorCursor.classList.remove("has-smile");
+      });
+      canvas.addEventListener("pointerleave", () => {
+        colorCursor.classList.remove("is-visible");
+        colorCursor.classList.remove("has-smile");
+      });
       canvas.addEventListener("click", updateColor);
     </script>
   </body>
