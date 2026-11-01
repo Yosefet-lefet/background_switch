@@ -32,9 +32,10 @@
       .color-cursor {
         position: fixed;
         z-index: 3;
-        width: 40px;
-        height: 40px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
+        overflow: hidden;
         opacity: 0;
         pointer-events: none;
         transform: translate(-50%, -50%);
@@ -81,30 +82,30 @@
 
       .cursor-eye {
         position: absolute;
-        top: 10px;
-        width: 4px;
-        height: 4px;
+        top: 25%;
+        width: 10%;
+        height: 10%;
         border-radius: 50%;
         background: #171717;
       }
 
       .cursor-eye:first-child {
-        left: 12px;
+        left: 30%;
       }
 
       .cursor-eye:nth-child(2) {
-        right: 12px;
+        right: 30%;
       }
 
       .cursor-smile {
         position: absolute;
-        top: 19px;
-        left: 11px;
-        width: 18px;
-        height: 9px;
-        border: 2px solid #171717;
+        top: 47.5%;
+        left: 27.5%;
+        width: 45%;
+        height: 22.5%;
+        border: 1px solid #171717;
         border-top: 0;
-        border-radius: 0 0 12px 12px;
+        border-radius: 0 0 50% 50%;
       }
 
       .color-reveal {
@@ -112,6 +113,47 @@
         z-index: 1;
         border-radius: 50%;
         pointer-events: none;
+      }
+
+      .color-explosion {
+        position: fixed;
+        z-index: 4;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .explosion-particle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        animation: color-burst 5s cubic-bezier(0.12, 0.72, 0.3, 1) forwards;
+      }
+
+      .color-explosion.is-static .explosion-particle {
+        top: var(--top);
+        left: var(--left);
+        opacity: 0.8;
+        animation: none;
+      }
+
+      @keyframes color-burst {
+        from {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(0.2);
+        }
+
+        to {
+          opacity: 0;
+          transform: translate(
+              calc(-50% + var(--burst-x)),
+              calc(-50% + var(--burst-y))
+            )
+            scale(1.2);
+        }
       }
 
       @media (hover: hover) and (pointer: fine) {
@@ -161,6 +203,8 @@
       let activeReveal;
       let activeTouchPointerId;
       let lastTrailPoint;
+      let cursorSize = 8;
+      let isExploding = false;
       const trailMarks = new Set();
 
       function drawFavicon(hue) {
@@ -221,6 +265,30 @@
       }
 
       function updateColor(event) {
+        if (isExploding) return;
+
+        cursorSize += 2;
+        colorCursor.style.width = `${cursorSize}px`;
+        colorCursor.style.height = `${cursorSize}px`;
+        const styledX = Number.parseFloat(colorCursor.style.left);
+        const styledY = Number.parseFloat(colorCursor.style.top);
+        const cursorX = Number.isFinite(styledX) ? styledX : event.clientX;
+        const cursorY = Number.isFinite(styledY) ? styledY : event.clientY;
+        const farthestCorner = Math.max(
+          Math.hypot(cursorX, cursorY),
+          Math.hypot(window.innerWidth - cursorX, cursorY),
+          Math.hypot(cursorX, window.innerHeight - cursorY),
+          Math.hypot(
+            window.innerWidth - cursorX,
+            window.innerHeight - cursorY,
+          ),
+        );
+
+        if (cursorSize >= farthestCorner * 2) {
+          startColorExplosion();
+          return;
+        }
+
         const isPastel = Math.random() < 0.35;
         const hue = Math.floor(Math.random() * 360);
         const saturation = isPastel
@@ -275,6 +343,47 @@
           reveal.remove();
           activeReveal = undefined;
         };
+      }
+
+      function startColorExplosion() {
+        isExploding = true;
+        colorCursor.classList.remove("is-visible", "has-smile");
+        const explosion = document.createElement("div");
+        explosion.className = "color-explosion";
+        const reducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        const particleCount = 72;
+
+        for (let index = 0; index < particleCount; index += 1) {
+          const angle = (index / particleCount) * Math.PI * 2;
+          const distance = Math.hypot(window.innerWidth, window.innerHeight);
+          const particle = document.createElement("div");
+          const isPastel = index % 3 === 0;
+          particle.className = "explosion-particle";
+          particle.style.backgroundColor = `hsl(${
+            (index / particleCount) * 360
+          } ${isPastel ? 65 : 78}% ${isPastel ? 82 : 55}%)`;
+          particle.style.setProperty("--burst-x", `${Math.cos(angle) * distance}px`);
+          particle.style.setProperty("--burst-y", `${Math.sin(angle) * distance}px`);
+
+          if (reducedMotion) {
+            explosion.classList.add("is-static");
+            particle.style.setProperty("--left", `${Math.random() * 100}%`);
+            particle.style.setProperty("--top", `${Math.random() * 100}%`);
+          }
+
+          explosion.append(particle);
+        }
+
+        document.body.append(explosion);
+        window.setTimeout(() => {
+          explosion.remove();
+          cursorSize = 8;
+          colorCursor.style.width = "8px";
+          colorCursor.style.height = "8px";
+          isExploding = false;
+        }, 5000);
       }
 
       function positionCursor(event) {
