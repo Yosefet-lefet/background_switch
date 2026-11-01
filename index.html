@@ -221,9 +221,14 @@
       }
 
       function updateColor(event) {
+        const isPastel = Math.random() < 0.35;
         const hue = Math.floor(Math.random() * 360);
-        const saturation = 52 + Math.floor(Math.random() * 25);
-        const lightness = 42 + Math.floor(Math.random() * 25);
+        const saturation = isPastel
+          ? 45 + Math.floor(Math.random() * 31)
+          : 52 + Math.floor(Math.random() * 25);
+        const lightness = isPastel
+          ? 78 + Math.floor(Math.random() * 13)
+          : 42 + Math.floor(Math.random() * 25);
         const color = toHex(hue, saturation, lightness);
         const cssColor = `hsl(${hue} ${saturation}% ${lightness}%)`;
         themeColor.setAttribute("content", color);
