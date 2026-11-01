@@ -25,6 +25,7 @@
         min-height: 100svh;
         background-color: #9c4b38;
         cursor: pointer;
+        touch-action: none;
         user-select: none;
       }
 
@@ -131,6 +132,7 @@
       faviconCanvas.width = 32;
       faviconCanvas.height = 32;
       let activeReveal;
+      let activeTouchPointerId;
 
       function drawFavicon(hue) {
         faviconContext.clearRect(0, 0, faviconCanvas.width, faviconCanvas.height);
@@ -242,7 +244,7 @@
       }
 
       function positionCursor(event) {
-        const touchOffset = event.pointerType === "touch" ? 20 : 0;
+        const touchOffset = event.pointerType === "touch" ? 50 : 0;
         colorCursor.style.left = `${event.clientX}px`;
         colorCursor.style.top = `${event.clientY - touchOffset}px`;
         colorCursor.classList.add("is-visible");
@@ -250,16 +252,25 @@
 
       canvas.addEventListener("pointermove", positionCursor);
       canvas.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "touch") {
+          activeTouchPointerId = event.pointerId;
+          canvas.setPointerCapture(event.pointerId);
+        }
         positionCursor(event);
         colorCursor.classList.add("has-smile");
       });
-      canvas.addEventListener("pointerup", () => {
+      function endPointer(event) {
         colorCursor.classList.remove("has-smile");
-      });
-      canvas.addEventListener("pointercancel", () => {
-        colorCursor.classList.remove("has-smile");
-      });
-      canvas.addEventListener("pointerleave", () => {
+        if (event.pointerType === "touch" && event.pointerId === activeTouchPointerId) {
+          activeTouchPointerId = undefined;
+          colorCursor.classList.remove("is-visible");
+        }
+      }
+
+      canvas.addEventListener("pointerup", endPointer);
+      canvas.addEventListener("pointercancel", endPointer);
+      canvas.addEventListener("pointerleave", (event) => {
+        if (event.pointerType === "touch" && event.pointerId === activeTouchPointerId) return;
         colorCursor.classList.remove("is-visible");
         colorCursor.classList.remove("has-smile");
       });
