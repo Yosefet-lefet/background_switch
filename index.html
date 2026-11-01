@@ -241,12 +241,16 @@
         };
       }
 
-      canvas.addEventListener("pointermove", (event) => {
+      function positionCursor(event) {
+        const touchOffset = event.pointerType === "touch" ? 20 : 0;
         colorCursor.style.left = `${event.clientX}px`;
-        colorCursor.style.top = `${event.clientY}px`;
+        colorCursor.style.top = `${event.clientY - touchOffset}px`;
         colorCursor.classList.add("is-visible");
-      });
-      canvas.addEventListener("pointerdown", () => {
+      }
+
+      canvas.addEventListener("pointermove", positionCursor);
+      canvas.addEventListener("pointerdown", (event) => {
+        positionCursor(event);
         colorCursor.classList.add("has-smile");
       });
       canvas.addEventListener("pointerup", () => {
