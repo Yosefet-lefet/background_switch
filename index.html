@@ -49,12 +49,12 @@
       .cursor-trail {
         position: fixed;
         z-index: 2;
-        width: 12px;
-        height: 12px;
+        width: var(--trail-size);
+        height: var(--trail-size);
         border-radius: 50%;
         pointer-events: none;
         transform: translate(-50%, -50%);
-        animation: trail-fade 1000ms ease-out forwards;
+        animation: trail-fade 1600ms ease-out forwards;
       }
 
       @keyframes trail-fade {
@@ -65,7 +65,17 @@
 
         to {
           opacity: 0;
-          transform: translate(-50%, -50%) scale(0.25);
+          transform: translate(-50%, -50%) scale(0.08);
+        }
+      }
+
+      @keyframes trail-fade-reduced {
+        from {
+          opacity: 0.9;
+        }
+
+        to {
+          opacity: 0;
         }
       }
 
@@ -174,7 +184,7 @@
         }
 
         .cursor-trail {
-          animation-duration: 0.01ms;
+          animation: trail-fade-reduced 1600ms ease-out forwards;
         }
       }
     </style>
@@ -341,15 +351,15 @@
         const reducedMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
-        const burstCount = 9;
-        const particlesPerBurst = 32;
+        const burstCount = 20;
+        const particlesPerBurst = 40;
         const screenDiagonal = Math.hypot(window.innerWidth, window.innerHeight);
 
         for (let burst = 0; burst < burstCount; burst += 1) {
-          const burstColumn = burst % 3;
-          const burstRow = Math.floor(burst / 3);
-          const burstOriginX = burstColumn * (100 / 3) + 12 + Math.random() * 10;
-          const burstOriginY = burstRow * (100 / 3) + 12 + Math.random() * 10;
+          const burstColumn = burst % 5;
+          const burstRow = Math.floor(burst / 5);
+          const burstOriginX = burstColumn * 20 + 7 + Math.random() * 6;
+          const burstOriginY = burstRow * 25 + 7 + Math.random() * 6;
 
           for (
             let particleIndex = 0;
@@ -359,7 +369,7 @@
             const angle =
               (particleIndex / particlesPerBurst) * Math.PI * 2 +
               (Math.random() - 0.5) * 0.24;
-            const distance = screenDiagonal * (0.2 + Math.random() * 0.42);
+            const distance = screenDiagonal * (0.35 + Math.random() * 0.65);
             const particle = document.createElement("div");
             const hue =
               (particleIndex * (360 / particlesPerBurst) +
@@ -378,16 +388,16 @@
               "--origin-y",
               `${reducedMotion ? 5 + Math.random() * 90 : burstOriginY}%`,
             );
-            particle.style.setProperty("--particle-size", `${9 + Math.random() * 23}px`);
+            particle.style.setProperty("--particle-size", `${12 + Math.random() * 26}px`);
             particle.style.setProperty("--burst-x", `${Math.cos(angle) * distance}px`);
             particle.style.setProperty("--burst-y", `${Math.sin(angle) * distance}px`);
             particle.style.setProperty(
               "--burst-delay",
-              `${burst * 300}ms`,
+              `${burst * 320}ms`,
             );
             particle.style.setProperty(
               "--burst-duration",
-              `${1700 + Math.random() * 700}ms`,
+              `${3200 + Math.random() * 700}ms`,
             );
 
             if (reducedMotion) {
@@ -406,7 +416,7 @@
           colorCursor.style.width = "8px";
           colorCursor.style.height = "8px";
           isExploding = false;
-        }, 5000);
+        }, 10000);
       }
 
       function positionCursor(event) {
@@ -440,6 +450,7 @@
         const mark = document.createElement("div");
         mark.className = "cursor-trail";
         mark.style.backgroundColor = `rgb(${255 - red} ${255 - green} ${255 - blue})`;
+        mark.style.setProperty("--trail-size", `${cursorSize}px`);
         mark.style.left = `${point.x}px`;
         mark.style.top = `${point.y}px`;
         document.body.append(mark);
