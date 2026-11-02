@@ -133,15 +133,97 @@
         pointer-events: none;
       }
 
-      .explosion-particle {
+      .color-explosion::before {
         position: absolute;
+        inset: -25%;
+        background: conic-gradient(
+          #ff1744,
+          #ff9100,
+          #ffea00,
+          #00e676,
+          #00e5ff,
+          #2979ff,
+          #d500f9,
+          #ff1744
+        );
+        content: "";
+        filter: blur(80px);
+        opacity: 0.08;
+        animation: celebration-glow 2.4s ease-in-out infinite alternate;
+      }
+
+      .color-explosion::after {
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at center,
+          rgb(8 3 28 / 38%),
+          rgb(8 3 28 / 72%)
+        );
+        content: "";
+        animation: celebration-night 700ms ease-out both;
+      }
+
+      .firework-burst {
+        position: absolute;
+        z-index: 2;
         top: var(--origin-y);
         left: var(--origin-x);
+        width: 0;
+        height: 0;
+      }
+
+      .firework-ring {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 150vmax;
+        height: 150vmax;
+        border: 8px solid var(--burst-color);
+        border-radius: 50%;
+        box-shadow:
+          0 0 24px 8px var(--burst-color),
+          inset 0 0 24px 8px var(--burst-color);
+        transform: translate(-50%, -50%) scale(0.01);
+        animation: ring-burst 2200ms cubic-bezier(0.12, 0.72, 0.3, 1)
+          var(--burst-delay) both;
+      }
+
+      .explosion-particle {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: var(--particle-size);
         height: var(--particle-size);
         border-radius: 50%;
+        background: radial-gradient(
+          circle at 32% 28%,
+          rgb(255 255 255 / 90%),
+          var(--particle-color) 36%,
+          var(--particle-color)
+        );
+        box-shadow:
+          0 0 6px 1px var(--particle-color),
+          0 0 14px 2px var(--particle-color);
+        will-change: transform, opacity;
         animation: color-burst var(--burst-duration)
-          cubic-bezier(0.12, 0.72, 0.3, 1) var(--burst-delay) forwards;
+          cubic-bezier(0.12, 0.72, 0.3, 1) var(--burst-delay) both;
+      }
+
+      .color-explosion.is-static::before {
+        animation: none;
+        opacity: 0.18;
+      }
+
+      .color-explosion.is-static::after {
+        animation: none;
+      }
+
+      .color-explosion.is-static .firework-ring {
+        opacity: 0.25;
+        transform: translate(-50%, -50%) scale(0.5);
+        animation: none;
       }
 
       .color-explosion.is-static .explosion-particle {
@@ -149,10 +231,48 @@
         animation: none;
       }
 
+      @keyframes celebration-glow {
+        from {
+          opacity: 0.06;
+          transform: rotate(0deg) scale(0.9);
+        }
+
+        @keyframes celebration-night {
+          from {
+            opacity: 0;
+          }
+
+          to {
+            opacity: 1;
+          }
+        }
+
+        to {
+          opacity: 0.12;
+          transform: rotate(24deg) scale(1.15);
+        }
+      }
+
+      @keyframes ring-burst {
+        from {
+          opacity: 0.95;
+          transform: translate(-50%, -50%) scale(0.01);
+        }
+
+        to {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
       @keyframes color-burst {
         from {
           opacity: 1;
-          transform: translate(-50%, -50%) scale(0.15);
+          transform: translate(-50%, -50%) scale(0.1);
+        }
+
+        65% {
+          opacity: 1;
         }
 
         to {
@@ -161,7 +281,7 @@
               calc(-50% + var(--burst-x)),
               calc(-50% + var(--burst-y))
             )
-            scale(1.5);
+            scale(2.4);
         }
       }
 
@@ -351,15 +471,32 @@
         const reducedMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
-        const burstCount = 20;
-        const particlesPerBurst = 40;
+        const burstCount = 30;
+        const particlesPerBurst = 64;
         const screenDiagonal = Math.hypot(window.innerWidth, window.innerHeight);
 
         for (let burst = 0; burst < burstCount; burst += 1) {
-          const burstColumn = burst % 5;
-          const burstRow = Math.floor(burst / 5);
-          const burstOriginX = burstColumn * 20 + 7 + Math.random() * 6;
-          const burstOriginY = burstRow * 25 + 7 + Math.random() * 6;
+          const burstColumn = burst % 6;
+          const burstRow = Math.floor(burst / 6);
+          const burstOriginX = burstColumn * (100 / 6) + 5 + Math.random() * 7;
+          const burstOriginY = burstRow * 20 + 5 + Math.random() * 8;
+          const burstHue = Math.random() * 360;
+          const burstDelay = `${burst * 190}ms`;
+          const firework = document.createElement("div");
+          const ring = document.createElement("div");
+          firework.className = "firework-burst";
+          firework.style.setProperty(
+            "--origin-x",
+            `${reducedMotion ? 5 + Math.random() * 90 : burstOriginX}%`,
+          );
+          firework.style.setProperty(
+            "--origin-y",
+            `${reducedMotion ? 5 + Math.random() * 90 : burstOriginY}%`,
+          );
+          ring.className = "firework-ring";
+          ring.style.setProperty("--burst-color", `hsl(${burstHue} 100% 65%)`);
+          ring.style.setProperty("--burst-delay", burstDelay);
+          firework.append(ring);
 
           for (
             let particleIndex = 0;
@@ -368,44 +505,29 @@
           ) {
             const angle =
               (particleIndex / particlesPerBurst) * Math.PI * 2 +
-              (Math.random() - 0.5) * 0.24;
-            const distance = screenDiagonal * (0.35 + Math.random() * 0.65);
+              (Math.random() - 0.5) * 0.36;
+            const distance = screenDiagonal * (0.4 + Math.random() * 0.8);
             const particle = document.createElement("div");
-            const hue =
-              (particleIndex * (360 / particlesPerBurst) +
-                burst * 19 +
-                Math.random() * 14) %
-              360;
+            const hue = (burstHue + (Math.random() - 0.5) * 110 + 360) % 360;
             particle.className = "explosion-particle";
-            particle.style.backgroundColor = `hsl(${hue} ${
-              72 + Math.random() * 28
-            }% ${48 + Math.random() * 24}%)`;
             particle.style.setProperty(
-              "--origin-x",
-              `${reducedMotion ? 5 + Math.random() * 90 : burstOriginX}%`,
+              "--particle-color",
+              `hsl(${hue} ${90 + Math.random() * 10}% ${52 + Math.random() * 18}%)`,
             );
-            particle.style.setProperty(
-              "--origin-y",
-              `${reducedMotion ? 5 + Math.random() * 90 : burstOriginY}%`,
-            );
-            particle.style.setProperty("--particle-size", `${12 + Math.random() * 26}px`);
+            particle.style.setProperty("--particle-size", `${8 + Math.random() * 20}px`);
             particle.style.setProperty("--burst-x", `${Math.cos(angle) * distance}px`);
             particle.style.setProperty("--burst-y", `${Math.sin(angle) * distance}px`);
-            particle.style.setProperty(
-              "--burst-delay",
-              `${burst * 320}ms`,
-            );
+            particle.style.setProperty("--burst-delay", burstDelay);
             particle.style.setProperty(
               "--burst-duration",
-              `${3200 + Math.random() * 700}ms`,
+              `${3000 + Math.random() * 1000}ms`,
             );
 
-            if (reducedMotion) {
-              explosion.classList.add("is-static");
-            }
-
-            explosion.append(particle);
+            firework.append(particle);
           }
+
+          if (reducedMotion) explosion.classList.add("is-static");
+          explosion.append(firework);
         }
 
         document.body.append(explosion);
