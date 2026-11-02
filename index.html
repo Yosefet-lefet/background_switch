@@ -90,6 +90,47 @@
         opacity: 1;
       }
 
+      .cursor-selfie {
+        display: none;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+
+      .has-selfie .cursor-selfie {
+        display: block;
+      }
+
+      .has-selfie .cursor-eye,
+      .has-selfie .cursor-smile {
+        display: none;
+      }
+
+      .camera-status {
+        position: fixed;
+        z-index: 5;
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
+        width: fit-content;
+        max-width: calc(100vw - 32px);
+        margin: 0 auto;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgb(0 0 0 / 75%);
+        color: #fff;
+        font: 14px/1.4 system-ui, sans-serif;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 150ms ease;
+      }
+
+      .camera-status.is-visible {
+        opacity: 1;
+      }
+
       .cursor-eye {
         position: absolute;
         top: 25%;
@@ -237,19 +278,19 @@
           transform: rotate(0deg) scale(0.9);
         }
 
-        @keyframes celebration-night {
-          from {
-            opacity: 0;
-          }
-
-          to {
-            opacity: 1;
-          }
-        }
-
         to {
           opacity: 0.12;
           transform: rotate(24deg) scale(1.15);
+        }
+      }
+
+      @keyframes celebration-night {
+        from {
+          opacity: 0;
+        }
+
+        to {
+          opacity: 1;
         }
       }
 
@@ -313,16 +354,20 @@
     <main class="canvas" id="canvas">
       <div class="color-cursor" id="color-cursor" aria-hidden="true">
         <span class="cursor-face">
+          <img class="cursor-selfie" alt="" draggable="false" />
           <span class="cursor-eye"></span>
           <span class="cursor-eye"></span>
           <span class="cursor-smile"></span>
         </span>
       </div>
     </main>
+    <div class="camera-status" id="camera-status" role="status" aria-live="polite"></div>
 
     <script>
       const canvas = document.querySelector("#canvas");
       const colorCursor = document.querySelector("#color-cursor");
+      const cursorSelfie = document.querySelector(".cursor-selfie");
+      const cameraStatus = document.querySelector("#camera-status");
       const themeColor = document.querySelector('meta[name="theme-color"]');
       const favicon = document.querySelector('link[rel="icon"]');
       const faviconCanvas = document.createElement("canvas");
@@ -335,6 +380,11 @@
       let cursorSize = 8;
       let clickCount = 0;
       let isExploding = false;
+      let cameraCapturePending = false;
+      let cameraGestureActive = false;
+      let cameraStatusTimeout;
+      const activeTouchPointers = new Set();
+      const cameraGesturePointers = new Set();
       const trailMarks = new Set();
 
       function drawFavicon(hue) {
@@ -548,6 +598,78 @@
         colorCursor.classList.add("is-visible");
       }
 
+      function showCameraError(error) {
+        console.error("Unable to capture a cursor selfie:", error);
+        cameraStatus.textContent =
+          "Camera unavailable. Allow camera access and try again.";
+        cameraStatus.classList.add("is-visible");
+        window.clearTimeout(cameraStatusTimeout);
+        cameraStatusTimeout = window.setTimeout(() => {
+          cameraStatus.classList.remove("is-visible");
+        }, 4000);
+      }
+
+      async function captureCursorSelfie() {
+        if (cameraCapturePending) return;
+        cameraCapturePending = true;
+        let stream;
+        let video;
+
+        try {
+          if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error("Camera access requires a secure browser context.");
+          }
+
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "user" } },
+            audio: false,
+          });
+          video = document.createElement("video");
+          video.autoplay = true;
+          video.muted = true;
+          video.playsInline = true;
+          video.srcObject = stream;
+          video.style.position = "fixed";
+          video.style.width = "1px";
+          video.style.height = "1px";
+          video.style.opacity = "0";
+          video.style.pointerEvents = "none";
+          document.body.append(video);
+          await video.play();
+
+          if (!video.videoWidth) {
+            await new Promise((resolve, reject) => {
+              video.addEventListener("loadeddata", resolve, { once: true });
+              video.addEventListener(
+                "error",
+                () => reject(new Error("The camera did not provide an image.")),
+                { once: true },
+              );
+            });
+          }
+
+          const photo = document.createElement("canvas");
+          photo.width = video.videoWidth;
+          photo.height = video.videoHeight;
+          const photoContext = photo.getContext("2d");
+          if (!photoContext) throw new Error("Could not prepare the camera image.");
+          photoContext.drawImage(video, 0, 0);
+          cursorSelfie.src = photo.toDataURL("image/jpeg", 0.88);
+          colorCursor.classList.add("has-selfie");
+          cameraStatus.classList.remove("is-visible");
+        } catch (error) {
+          showCameraError(error);
+        } finally {
+          stream?.getTracks().forEach((track) => track.stop());
+          if (video) {
+            video.pause();
+            video.srcObject = null;
+            video.remove();
+          }
+          cameraCapturePending = false;
+        }
+      }
+
       function leaveTrail(event) {
         if (
           event.pointerType === "touch" &&
@@ -600,31 +722,65 @@
       });
       canvas.addEventListener("pointerdown", (event) => {
         if (event.pointerType === "touch") {
+          activeTouchPointers.add(event.pointerId);
           activeTouchPointerId = event.pointerId;
           lastTrailPoint = undefined;
           canvas.setPointerCapture(event.pointerId);
+
+          if (activeTouchPointers.size === 3 && !cameraGestureActive) {
+            cameraGestureActive = true;
+            activeTouchPointers.forEach((pointerId) => {
+              cameraGesturePointers.add(pointerId);
+            });
+            void captureCursorSelfie();
+          }
         }
         positionCursor(event);
         colorCursor.classList.add("has-smile");
       });
       function endPointer(event) {
-        colorCursor.classList.remove("has-smile");
-        if (event.pointerType === "touch" && event.pointerId === activeTouchPointerId) {
-          activeTouchPointerId = undefined;
+        if (event.pointerType === "touch") {
+          activeTouchPointers.delete(event.pointerId);
+          cameraGesturePointers.delete(event.pointerId);
+          if (event.pointerId === activeTouchPointerId) {
+            activeTouchPointerId = activeTouchPointers.values().next().value;
+          }
+          if (cameraGesturePointers.size === 0) {
+            window.setTimeout(() => {
+              cameraGestureActive = false;
+            }, 500);
+          }
+          if (activeTouchPointers.size === 0) {
+            colorCursor.classList.remove("has-smile");
+            colorCursor.classList.remove("is-visible");
+            lastTrailPoint = undefined;
+          }
+        } else {
+          colorCursor.classList.remove("has-smile");
+        }
+
+        if (event.pointerType === "touch" && activeTouchPointers.size === 0) {
           lastTrailPoint = undefined;
-          colorCursor.classList.remove("is-visible");
         }
       }
 
       canvas.addEventListener("pointerup", endPointer);
       canvas.addEventListener("pointercancel", endPointer);
       canvas.addEventListener("pointerleave", (event) => {
-        if (event.pointerType === "touch" && event.pointerId === activeTouchPointerId) return;
+        if (
+          event.pointerType === "touch" &&
+          activeTouchPointers.has(event.pointerId)
+        ) {
+          return;
+        }
         lastTrailPoint = undefined;
         colorCursor.classList.remove("is-visible");
         colorCursor.classList.remove("has-smile");
       });
-      canvas.addEventListener("click", updateColor);
+      canvas.addEventListener("click", (event) => {
+        if (event.pointerType === "touch" && cameraGestureActive) return;
+        updateColor(event);
+      });
     </script>
   </body>
 </html>
