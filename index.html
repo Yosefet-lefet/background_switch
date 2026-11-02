@@ -203,6 +203,7 @@
       let activeTouchPointerId;
       let lastTrailPoint;
       let cursorSize = 8;
+      let clickCount = 0;
       let isExploding = false;
       const trailMarks = new Set();
 
@@ -266,24 +267,12 @@
       function updateColor(event) {
         if (isExploding) return;
 
+        clickCount += 1;
         cursorSize += 3;
         colorCursor.style.width = `${cursorSize}px`;
         colorCursor.style.height = `${cursorSize}px`;
-        const styledX = Number.parseFloat(colorCursor.style.left);
-        const styledY = Number.parseFloat(colorCursor.style.top);
-        const cursorX = Number.isFinite(styledX) ? styledX : event.clientX;
-        const cursorY = Number.isFinite(styledY) ? styledY : event.clientY;
-        const farthestCorner = Math.max(
-          Math.hypot(cursorX, cursorY),
-          Math.hypot(window.innerWidth - cursorX, cursorY),
-          Math.hypot(cursorX, window.innerHeight - cursorY),
-          Math.hypot(
-            window.innerWidth - cursorX,
-            window.innerHeight - cursorY,
-          ),
-        );
 
-        if (cursorSize >= farthestCorner * 2) {
+        if (clickCount >= 100) {
           startColorExplosion();
           return;
         }
@@ -413,6 +402,7 @@
         window.setTimeout(() => {
           explosion.remove();
           cursorSize = 8;
+          clickCount = 0;
           colorCursor.style.width = "8px";
           colorCursor.style.height = "8px";
           isExploding = false;
