@@ -100,6 +100,7 @@
         height: 100%;
         border-radius: 50%;
         object-fit: cover;
+        pointer-events: none;
         transform: scaleX(-1);
       }
 
@@ -736,6 +737,7 @@
       });
       canvas.addEventListener("pointerdown", (event) => {
         if (event.pointerType === "touch") {
+          suppressedCameraClickPointers.delete(event.pointerId);
           activeTouchPointers.add(event.pointerId);
           activeTouchPointerId = event.pointerId;
           lastTrailPoint = undefined;
