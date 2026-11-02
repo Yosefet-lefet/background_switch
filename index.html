@@ -90,6 +90,10 @@
         opacity: 1;
       }
 
+      .has-selfie .cursor-face {
+        opacity: 1;
+      }
+
       .cursor-selfie {
         display: none;
         width: 100%;
@@ -385,6 +389,7 @@
       let cameraStatusTimeout;
       const activeTouchPointers = new Set();
       const cameraGesturePointers = new Set();
+      const suppressedCameraClickPointers = new Set();
       const trailMarks = new Set();
 
       function drawFavicon(hue) {
@@ -670,6 +675,15 @@
         }
       }
 
+      function resetActiveTouchGesture() {
+        activeTouchPointers.clear();
+        cameraGesturePointers.clear();
+        cameraGestureActive = false;
+        activeTouchPointerId = undefined;
+        lastTrailPoint = undefined;
+        colorCursor.classList.remove("has-smile", "is-visible");
+      }
+
       function leaveTrail(event) {
         if (
           event.pointerType === "touch" &&
@@ -731,6 +745,10 @@
             cameraGestureActive = true;
             activeTouchPointers.forEach((pointerId) => {
               cameraGesturePointers.add(pointerId);
+              suppressedCameraClickPointers.add(pointerId);
+              window.setTimeout(() => {
+                suppressedCameraClickPointers.delete(pointerId);
+              }, 1000);
             });
             void captureCursorSelfie();
           }
@@ -746,9 +764,7 @@
             activeTouchPointerId = activeTouchPointers.values().next().value;
           }
           if (cameraGesturePointers.size === 0) {
-            window.setTimeout(() => {
-              cameraGestureActive = false;
-            }, 500);
+            cameraGestureActive = false;
           }
           if (activeTouchPointers.size === 0) {
             colorCursor.classList.remove("has-smile");
@@ -766,6 +782,7 @@
 
       canvas.addEventListener("pointerup", endPointer);
       canvas.addEventListener("pointercancel", endPointer);
+      window.addEventListener("blur", resetActiveTouchGesture);
       canvas.addEventListener("pointerleave", (event) => {
         if (
           event.pointerType === "touch" &&
@@ -778,7 +795,12 @@
         colorCursor.classList.remove("has-smile");
       });
       canvas.addEventListener("click", (event) => {
-        if (event.pointerType === "touch" && cameraGestureActive) return;
+        if (
+          event.pointerType === "touch" &&
+          suppressedCameraClickPointers.delete(event.pointerId)
+        ) {
+          return;
+        }
         updateColor(event);
       });
     </script>
