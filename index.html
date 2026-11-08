@@ -252,9 +252,27 @@
         box-shadow:
           0 0 6px 1px var(--particle-color),
           0 0 14px 2px var(--particle-color);
-        will-change: transform, opacity;
         animation: color-burst var(--burst-duration)
           cubic-bezier(0.12, 0.72, 0.3, 1) var(--burst-delay) both;
+      }
+
+      @media (pointer: coarse) {
+        .color-explosion::before {
+          filter: blur(32px);
+          animation: none;
+          opacity: 0.06;
+        }
+
+        .firework-ring {
+          width: 90vmax;
+          height: 90vmax;
+          border-width: 4px;
+          box-shadow: 0 0 12px 4px var(--burst-color);
+        }
+
+        .explosion-particle {
+          box-shadow: 0 0 5px 1px var(--particle-color);
+        }
       }
 
       .color-explosion.is-static::before {
@@ -388,9 +406,11 @@
       let cameraCapturePending = false;
       let cameraGestureActive = false;
       let cameraStatusTimeout;
+      let lastTouchPointerUpAt = Number.NEGATIVE_INFINITY;
       const activeTouchPointers = new Set();
       const cameraGesturePointers = new Set();
-      const suppressedCameraClickPointers = new Set();
+      const suppressedTouchClickPointers = new Set();
+      const touchPointerStarts = new Map();
       const trailMarks = new Set();
 
       function drawFavicon(hue) {
@@ -527,8 +547,11 @@
         const reducedMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
-        const burstCount = 30;
-        const particlesPerBurst = 64;
+        const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+        const burstCount = isTouchDevice ? 8 : 30;
+        const particlesPerBurst = isTouchDevice ? 20 : 64;
+        const burstInterval = isTouchDevice ? 120 : 190;
+        const burstDuration = isTouchDevice ? 1500 : 3000;
         const screenDiagonal = Math.hypot(window.innerWidth, window.innerHeight);
 
         for (let burst = 0; burst < burstCount; burst += 1) {
@@ -537,7 +560,7 @@
           const burstOriginX = burstColumn * (100 / 6) + 5 + Math.random() * 7;
           const burstOriginY = burstRow * 20 + 5 + Math.random() * 8;
           const burstHue = Math.random() * 360;
-          const burstDelay = `${burst * 190}ms`;
+          const burstDelay = `${burst * burstInterval}ms`;
           const firework = document.createElement("div");
           const ring = document.createElement("div");
           firework.className = "firework-burst";
@@ -576,7 +599,7 @@
             particle.style.setProperty("--burst-delay", burstDelay);
             particle.style.setProperty(
               "--burst-duration",
-              `${3000 + Math.random() * 1000}ms`,
+              `${burstDuration + Math.random() * (isTouchDevice ? 400 : 1000)}ms`,
             );
 
             firework.append(particle);
@@ -594,7 +617,7 @@
           colorCursor.style.width = "8px";
           colorCursor.style.height = "8px";
           isExploding = false;
-        }, 10000);
+        }, isTouchDevice ? 3500 : 10000);
       }
 
       function positionCursor(event) {
@@ -679,6 +702,7 @@
       function resetActiveTouchGesture() {
         activeTouchPointers.clear();
         cameraGesturePointers.clear();
+        touchPointerStarts.clear();
         cameraGestureActive = false;
         activeTouchPointerId = undefined;
         lastTrailPoint = undefined;
@@ -734,10 +758,24 @@
       canvas.addEventListener("pointermove", (event) => {
         positionCursor(event);
         leaveTrail(event);
+        if (
+          event.pointerType === "touch" &&
+          touchPointerStarts.has(event.pointerId) &&
+          Math.hypot(
+            event.clientX - touchPointerStarts.get(event.pointerId).x,
+            event.clientY - touchPointerStarts.get(event.pointerId).y,
+          ) > 12
+        ) {
+          touchPointerStarts.delete(event.pointerId);
+        }
       });
       canvas.addEventListener("pointerdown", (event) => {
         if (event.pointerType === "touch") {
-          suppressedCameraClickPointers.delete(event.pointerId);
+          suppressedTouchClickPointers.delete(event.pointerId);
+          touchPointerStarts.set(event.pointerId, {
+            x: event.clientX,
+            y: event.clientY,
+          });
           activeTouchPointers.add(event.pointerId);
           activeTouchPointerId = event.pointerId;
           lastTrailPoint = undefined;
@@ -747,9 +785,9 @@
             cameraGestureActive = true;
             activeTouchPointers.forEach((pointerId) => {
               cameraGesturePointers.add(pointerId);
-              suppressedCameraClickPointers.add(pointerId);
+              suppressedTouchClickPointers.add(pointerId);
               window.setTimeout(() => {
-                suppressedCameraClickPointers.delete(pointerId);
+                suppressedTouchClickPointers.delete(pointerId);
               }, 1000);
             });
             void captureCursorSelfie();
@@ -760,6 +798,27 @@
       });
       function endPointer(event) {
         if (event.pointerType === "touch") {
+          if (event.type === "pointerup") {
+            lastTouchPointerUpAt = performance.now();
+          }
+          const isCameraGesturePointer = suppressedTouchClickPointers.has(
+            event.pointerId,
+          );
+          const touchStart = touchPointerStarts.get(event.pointerId);
+          touchPointerStarts.delete(event.pointerId);
+          if (
+            event.type === "pointerup" &&
+            touchStart &&
+            !isCameraGesturePointer &&
+            Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y) <=
+              12
+          ) {
+            updateColor(event);
+            suppressedTouchClickPointers.add(event.pointerId);
+            window.setTimeout(() => {
+              suppressedTouchClickPointers.delete(event.pointerId);
+            }, 1000);
+          }
           activeTouchPointers.delete(event.pointerId);
           cameraGesturePointers.delete(event.pointerId);
           if (event.pointerId === activeTouchPointerId) {
@@ -799,7 +858,13 @@
       canvas.addEventListener("click", (event) => {
         if (
           event.pointerType === "touch" &&
-          suppressedCameraClickPointers.delete(event.pointerId)
+          suppressedTouchClickPointers.delete(event.pointerId)
+        ) {
+          return;
+        }
+        if (
+          event.pointerType === "touch" ||
+          (event.detail > 0 && performance.now() - lastTouchPointerUpAt < 1000)
         ) {
           return;
         }
