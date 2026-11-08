@@ -256,22 +256,16 @@
           cubic-bezier(0.12, 0.72, 0.3, 1) var(--burst-delay) both;
       }
 
-      @media (pointer: coarse) {
-        .color-explosion::before {
-          filter: blur(32px);
-          animation: none;
-          opacity: 0.06;
-        }
-
+      @media (pointer: coarse), (max-width: 700px) {
+        .color-explosion::before,
+        .color-explosion::after,
         .firework-ring {
-          width: 90vmax;
-          height: 90vmax;
-          border-width: 4px;
-          box-shadow: 0 0 12px 4px var(--burst-color);
+          display: none;
         }
 
         .explosion-particle {
-          box-shadow: 0 0 5px 1px var(--particle-color);
+          background: var(--particle-color);
+          box-shadow: none;
         }
       }
 
@@ -547,11 +541,13 @@
         const reducedMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
-        const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-        const burstCount = isTouchDevice ? 8 : 30;
-        const particlesPerBurst = isTouchDevice ? 20 : 64;
-        const burstInterval = isTouchDevice ? 120 : 190;
-        const burstDuration = isTouchDevice ? 1500 : 3000;
+        const isMobile = window.matchMedia(
+          "(pointer: coarse), (max-width: 700px)",
+        ).matches;
+        const burstCount = isMobile ? 3 : 30;
+        const particlesPerBurst = isMobile ? 6 : 64;
+        const burstInterval = isMobile ? 110 : 190;
+        const burstDuration = isMobile ? 900 : 3000;
         const screenDiagonal = Math.hypot(window.innerWidth, window.innerHeight);
 
         for (let burst = 0; burst < burstCount; burst += 1) {
@@ -585,7 +581,9 @@
             const angle =
               (particleIndex / particlesPerBurst) * Math.PI * 2 +
               (Math.random() - 0.5) * 0.36;
-            const distance = screenDiagonal * (0.4 + Math.random() * 0.8);
+            const distance =
+              screenDiagonal *
+              (isMobile ? 0.18 + Math.random() * 0.24 : 0.4 + Math.random() * 0.8);
             const particle = document.createElement("div");
             const hue = (burstHue + (Math.random() - 0.5) * 110 + 360) % 360;
             particle.className = "explosion-particle";
@@ -593,13 +591,16 @@
               "--particle-color",
               `hsl(${hue} ${90 + Math.random() * 10}% ${52 + Math.random() * 18}%)`,
             );
-            particle.style.setProperty("--particle-size", `${8 + Math.random() * 20}px`);
+            particle.style.setProperty(
+              "--particle-size",
+              `${isMobile ? 4 + Math.random() * 5 : 8 + Math.random() * 20}px`,
+            );
             particle.style.setProperty("--burst-x", `${Math.cos(angle) * distance}px`);
             particle.style.setProperty("--burst-y", `${Math.sin(angle) * distance}px`);
             particle.style.setProperty("--burst-delay", burstDelay);
             particle.style.setProperty(
               "--burst-duration",
-              `${burstDuration + Math.random() * (isTouchDevice ? 400 : 1000)}ms`,
+              `${burstDuration + Math.random() * (isMobile ? 200 : 1000)}ms`,
             );
 
             firework.append(particle);
@@ -617,7 +618,7 @@
           colorCursor.style.width = "8px";
           colorCursor.style.height = "8px";
           isExploding = false;
-        }, isTouchDevice ? 3500 : 10000);
+        }, isMobile ? 1600 : 10000);
       }
 
       function positionCursor(event) {
