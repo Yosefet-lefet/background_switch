@@ -256,19 +256,6 @@
           cubic-bezier(0.12, 0.72, 0.3, 1) var(--burst-delay) both;
       }
 
-      @media (pointer: coarse), (max-width: 700px) {
-        .color-explosion::before,
-        .color-explosion::after,
-        .firework-ring {
-          display: none;
-        }
-
-        .explosion-particle {
-          background: var(--particle-color);
-          box-shadow: none;
-        }
-      }
-
       .color-explosion.is-static::before {
         animation: none;
         opacity: 0.18;
@@ -464,19 +451,7 @@
           .join("")}`;
       }
 
-      function updateColor(event) {
-        if (isExploding) return;
-
-        clickCount += 1;
-        cursorSize += 3;
-        colorCursor.style.width = `${cursorSize}px`;
-        colorCursor.style.height = `${cursorSize}px`;
-
-        if (clickCount >= 100) {
-          startColorExplosion();
-          return;
-        }
-
+      function getRandomColor() {
         const isPastel = Math.random() < 0.35;
         const hue = Math.floor(Math.random() * 360);
         const saturation = isPastel
@@ -485,10 +460,13 @@
         const lightness = isPastel
           ? 78 + Math.floor(Math.random() * 13)
           : 42 + Math.floor(Math.random() * 25);
-        const color = toHex(hue, saturation, lightness);
-        const cssColor = `hsl(${hue} ${saturation}% ${lightness}%)`;
-        themeColor.setAttribute("content", color);
+        return {
+          color: toHex(hue, saturation, lightness),
+          cssColor: `hsl(${hue} ${saturation}% ${lightness}%)`,
+        };
+      }
 
+      function revealColor(cssColor, x, y, duration = 750) {
         if (activeReveal) {
           canvas.style.backgroundColor = activeReveal.cssColor;
           activeReveal.animation.cancel();
@@ -501,8 +479,6 @@
           return;
         }
 
-        const x = event.clientX;
-        const y = event.clientY;
         const radius = Math.hypot(
           Math.max(x, window.innerWidth - x),
           Math.max(y, window.innerHeight - y),
@@ -517,11 +493,8 @@
         document.body.append(reveal);
 
         const animation = reveal.animate(
-          [
-            { transform: "scale(0.0005)" },
-            { transform: "scale(1)" },
-          ],
-          { duration: 750, easing: "ease-out" },
+          [{ transform: "scale(0.0005)" }, { transform: "scale(1)" }],
+          { duration, easing: "ease-out" },
         );
         const revealState = { animation, cssColor, element: reveal };
         activeReveal = revealState;
@@ -533,21 +506,73 @@
         };
       }
 
-      function startColorExplosion() {
+      function updateColor(event) {
+        if (isExploding) return;
+
+        clickCount += 1;
+        cursorSize += 3;
+        colorCursor.style.width = `${cursorSize}px`;
+        colorCursor.style.height = `${cursorSize}px`;
+
+        if (clickCount >= 100) {
+          startColorExplosion(event);
+          return;
+        }
+
+        const { color, cssColor } = getRandomColor();
+        themeColor.setAttribute("content", color);
+        revealColor(cssColor, event.clientX, event.clientY);
+      }
+
+      function startColorExplosion(event) {
         isExploding = true;
         colorCursor.classList.remove("is-visible", "has-smile");
-        const explosion = document.createElement("div");
-        explosion.className = "color-explosion";
         const reducedMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
         const isMobile = window.matchMedia(
           "(pointer: coarse), (max-width: 700px)",
         ).matches;
-        const burstCount = isMobile ? 3 : 30;
-        const particlesPerBurst = isMobile ? 6 : 64;
-        const burstInterval = isMobile ? 110 : 190;
-        const burstDuration = isMobile ? 900 : 3000;
+        if (isMobile) {
+          const colorCount = reducedMotion ? 1 : 7;
+          const colorInterval = 260;
+          const revealDuration = 500;
+          const celebrationDuration = reducedMotion
+            ? 1200
+            : (colorCount - 1) * colorInterval + revealDuration + 100;
+
+          for (let colorIndex = 0; colorIndex < colorCount; colorIndex += 1) {
+            window.setTimeout(() => {
+              const { color, cssColor } = getRandomColor();
+              themeColor.setAttribute("content", color);
+              const x =
+                colorIndex === 0
+                  ? event.clientX
+                  : window.innerWidth * (0.15 + Math.random() * 0.7);
+              const y =
+                colorIndex === 0
+                  ? event.clientY
+                  : window.innerHeight * (0.15 + Math.random() * 0.7);
+              revealColor(cssColor, x, y, revealDuration);
+            }, colorIndex * colorInterval);
+          }
+
+          window.setTimeout(() => {
+            cursorSize = 8;
+            clickCount = 0;
+            colorCursor.style.width = "8px";
+            colorCursor.style.height = "8px";
+            isExploding = false;
+          }, celebrationDuration);
+          return;
+        }
+
+        const explosion = document.createElement("div");
+        explosion.className = "color-explosion";
+        const burstCount = 30;
+        const particlesPerBurst = 64;
+        const burstInterval = 190;
+        const burstDuration = 3000;
         const screenDiagonal = Math.hypot(window.innerWidth, window.innerHeight);
 
         for (let burst = 0; burst < burstCount; burst += 1) {
@@ -581,9 +606,7 @@
             const angle =
               (particleIndex / particlesPerBurst) * Math.PI * 2 +
               (Math.random() - 0.5) * 0.36;
-            const distance =
-              screenDiagonal *
-              (isMobile ? 0.18 + Math.random() * 0.24 : 0.4 + Math.random() * 0.8);
+            const distance = screenDiagonal * (0.4 + Math.random() * 0.8);
             const particle = document.createElement("div");
             const hue = (burstHue + (Math.random() - 0.5) * 110 + 360) % 360;
             particle.className = "explosion-particle";
@@ -593,14 +616,14 @@
             );
             particle.style.setProperty(
               "--particle-size",
-              `${isMobile ? 4 + Math.random() * 5 : 8 + Math.random() * 20}px`,
+              `${8 + Math.random() * 20}px`,
             );
             particle.style.setProperty("--burst-x", `${Math.cos(angle) * distance}px`);
             particle.style.setProperty("--burst-y", `${Math.sin(angle) * distance}px`);
             particle.style.setProperty("--burst-delay", burstDelay);
             particle.style.setProperty(
               "--burst-duration",
-              `${burstDuration + Math.random() * (isMobile ? 200 : 1000)}ms`,
+              `${burstDuration + Math.random() * 1000}ms`,
             );
 
             firework.append(particle);
@@ -618,7 +641,7 @@
           colorCursor.style.width = "8px";
           colorCursor.style.height = "8px";
           isExploding = false;
-        }, isMobile ? 1600 : 10000);
+        }, 10000);
       }
 
       function positionCursor(event) {
